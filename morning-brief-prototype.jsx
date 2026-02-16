@@ -540,10 +540,21 @@ function ConversationBrief({ pad, setPad, user = null }) {
             text: "Good morning! No urgent items right now. Connect your integrations (Slack, GitHub, Jira, Calendar) to see your brief items here."
           }]);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Failed to load brief:", error);
-        // Fallback to placeholder data if API fails
-        setMessages([CONVO[0]]);
+        // Show error message instead of placeholder data
+        const errorMsg = error?.response?.status === 401 
+          ? "Please log in to see your brief items."
+          : error?.response?.status === 404
+          ? "Backend API not found. Please check your API URL configuration."
+          : error?.message?.includes('Network Error') || error?.code === 'ERR_NETWORK'
+          ? `Cannot connect to backend API. Check that:\n1. Backend is running at ${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}\n2. VITE_API_URL is set in Vercel environment variables\n3. Backend CORS is configured correctly`
+          : `Failed to load brief: ${error?.message || 'Unknown error'}`;
+        
+        setMessages([{
+          type: "assistant",
+          text: errorMsg
+        }]);
         setStep(0);
       } finally {
         setLoadingBrief(false);
