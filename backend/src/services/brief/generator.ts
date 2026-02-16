@@ -87,8 +87,8 @@ export class BriefGenerator {
 
       items.push({
         user_id: userId,
-        type: 'item',
-        source: 'slack',
+        type: 'item' as const,
+        source: 'slack' as const,
         urgency,
         text: `Thread in ${thread.channel}: ${firstMessage.text.substring(0, 100)}... (${replyCount} replies)`,
         metadata: {
@@ -100,7 +100,7 @@ export class BriefGenerator {
         external_id: `${thread.channel}-${thread.thread_ts}`,
         external_url: `https://slack.com/app_redirect?channel=${thread.channel}&ts=${thread.thread_ts}`,
         processed_at: new Date()
-      });
+      } as any);
     }
 
     return items;
@@ -129,8 +129,8 @@ export class BriefGenerator {
 
       items.push({
         user_id: userId,
-        type: 'item',
-        source: 'github',
+        type: 'item' as const,
+        source: 'github' as const,
         urgency,
         text: `PR #${pr.number}: ${pr.title} - ${pr.changed_files || 0} files changed`,
         metadata: {
@@ -144,7 +144,7 @@ export class BriefGenerator {
         external_id: `pr-${pr.id}`,
         external_url: pr.html_url,
         processed_at: new Date()
-      });
+      } as any);
     }
 
     return items;
@@ -174,8 +174,8 @@ export class BriefGenerator {
 
       items.push({
         user_id: userId,
-        type: 'item',
-        source: 'jira',
+        type: 'item' as const,
+        source: 'jira' as const,
         urgency,
         text: `${issue.key}: ${issue.summary}`,
         metadata: {
@@ -187,7 +187,7 @@ export class BriefGenerator {
         external_id: issue.id,
         external_url: issue.url,
         processed_at: new Date()
-      });
+      } as any);
     }
 
     return items;
@@ -207,9 +207,9 @@ export class BriefGenerator {
     // Create a single calendar item summarizing the day
     const items: BriefItem[] = [{
       user_id: userId,
-      type: 'calendar',
-      source: 'calendar',
-      urgency: 'fyi',
+      type: 'calendar' as const,
+      source: 'calendar' as const,
+      urgency: 'fyi' as const,
       text: `Today's schedule: ${events.length} event${events.length > 1 ? 's' : ''}`,
       metadata: {
         events: events.map(e => ({
@@ -220,7 +220,7 @@ export class BriefGenerator {
       },
       external_id: `calendar-${new Date().toISOString().split('T')[0]}`,
       processed_at: new Date()
-    }];
+    } as any];
 
     return items;
   }

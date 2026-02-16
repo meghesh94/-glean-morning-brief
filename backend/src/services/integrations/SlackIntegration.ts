@@ -44,7 +44,7 @@ export class SlackIntegration extends BaseIntegration {
       })
     });
 
-    const data = await response.json();
+    const data: any = await response.json();
     if (!data.ok) {
       throw new Error(`Slack OAuth error: ${data.error}`);
     }
@@ -68,7 +68,7 @@ export class SlackIntegration extends BaseIntegration {
       })
     });
 
-    const data = await response.json();
+    const data: any = await response.json();
     if (!data.ok) {
       throw new Error(`Slack token refresh error: ${data.error}`);
     }
@@ -123,13 +123,13 @@ export class SlackIntegration extends BaseIntegration {
 
               if (replies.messages && replies.messages.length > 2) {
                 urgentThreads.push({
-                  channel: channel.id,
-                  thread_ts: threadTs,
-                  messages: replies.messages.map(m => ({
+                  channel: channel.id || '',
+                  thread_ts: threadTs || '',
+                  messages: replies.messages.map((m: any) => ({
                     text: m.text || '',
                     thread_ts: m.thread_ts,
-                    channel: channel.id,
-                    user: m.user,
+                    channel: channel.id || '',
+                    user: m.user || '',
                     ts: m.ts || ''
                   }))
                 });

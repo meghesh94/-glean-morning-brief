@@ -45,7 +45,7 @@ export class IntegrationModel {
       'SELECT * FROM integrations WHERE user_id = $1 ORDER BY provider',
       [userId]
     );
-    return result.rows.map(row => ({
+    return result.rows.map((row: any) => ({
       ...row,
       config: typeof row.config === 'string' ? JSON.parse(row.config) : row.config
     }));

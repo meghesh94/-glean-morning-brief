@@ -55,7 +55,7 @@ export class BriefItemModel {
        LIMIT $2`,
       [userId, limit]
     );
-    return result.rows.map(row => ({
+    return result.rows.map((row: any) => ({
       ...row,
       metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata
     }));

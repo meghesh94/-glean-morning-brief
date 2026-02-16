@@ -42,7 +42,7 @@ export class CalendarIntegration extends BaseIntegration {
       })
     });
 
-    const data = await response.json();
+    const data: any = await response.json();
     if (data.error) {
       throw new Error(`Google OAuth error: ${data.error}`);
     }
@@ -66,7 +66,7 @@ export class CalendarIntegration extends BaseIntegration {
       })
     });
 
-    const data = await response.json();
+    const data: any = await response.json();
     if (data.error) {
       throw new Error(`Google token refresh error: ${data.error}`);
     }

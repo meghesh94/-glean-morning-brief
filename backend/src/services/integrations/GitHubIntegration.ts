@@ -51,7 +51,7 @@ export class GitHubIntegration extends BaseIntegration {
       })
     });
 
-    const data = await response.json();
+    const data: any = await response.json();
     if (data.error) {
       throw new Error(`GitHub OAuth error: ${data.error}`);
     }

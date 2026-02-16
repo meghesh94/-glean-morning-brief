@@ -47,7 +47,7 @@ export class JiraIntegration extends BaseIntegration {
       })
     });
 
-    const data = await response.json();
+    const data: any = await response.json();
     if (data.error) {
       throw new Error(`Jira OAuth error: ${data.error}`);
     }
@@ -71,7 +71,7 @@ export class JiraIntegration extends BaseIntegration {
       })
     });
 
-    const data = await response.json();
+    const data: any = await response.json();
     if (data.error) {
       throw new Error(`Jira token refresh error: ${data.error}`);
     }
