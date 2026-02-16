@@ -3,6 +3,9 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import pool from './db/connection';
+import fs from 'fs';
+import path from 'path';
 
 dotenv.config();
 
@@ -21,6 +24,48 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+
+// Run migrations on startup (idempotent - safe to run multiple times)
+async function runMigrations() {
+  try {
+    // Check if users table exists
+    const checkResult = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'users'
+      );
+    `);
+    
+    if (checkResult.rows[0].exists) {
+      console.log('Database tables already exist, skipping migration');
+      return;
+    }
+    
+    // Run migration
+    console.log('Running database migrations...');
+    const schemaPath = path.join(__dirname, 'db', 'schema.sql');
+    const schema = fs.readFileSync(schemaPath, 'utf8');
+    await pool.query(schema);
+    console.log('✅ Database migration completed successfully');
+  } catch (error: any) {
+    console.error('❌ Migration failed:', error.message);
+    // Don't exit - let server start anyway (might be a connection issue)
+  }
+}
+
+// Migration endpoint (for manual trigger)
+app.post('/api/migrate', async (req: any, res: any) => {
+  try {
+    const schemaPath = path.join(__dirname, 'db', 'schema.sql');
+    const schema = fs.readFileSync(schemaPath, 'utf8');
+    await pool.query(schema);
+    res.json({ success: true, message: 'Migration completed' });
+  } catch (error: any) {
+    console.error('Migration error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // Health check
 app.get('/health', (req: any, res: any) => {
@@ -52,9 +97,15 @@ app.use('/api/conversation', conversationRoutes);
 
 const PORT = process.env.PORT || 3001;
 
-httpServer.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+// Start server after migrations
+runMigrations().then(() => {
+  httpServer.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+}).catch((error) => {
+  console.error('Failed to start server:', error);
+  process.exit(1);
 });
 
 export { app, io };
