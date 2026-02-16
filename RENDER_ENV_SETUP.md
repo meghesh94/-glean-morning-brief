@@ -54,7 +54,35 @@ Value: https://your-vercel-app.vercel.app
 ```
 **Update this after you deploy to Vercel** with your actual Vercel URL.
 
-## Optional: Integration Credentials
+### 6. Glean MCP (Recommended - Single Integration)
+```
+Key: GLEAN_MCP_ENABLED
+Value: true
+
+Key: GLEAN_MCP_URL
+Value: https://your-company.glean.com
+
+Key: GLEAN_OAUTH_TOKEN
+Value: your-glean-oauth-token
+```
+**OR use API key instead:**
+```
+Key: GLEAN_API_KEY
+Value: your-glean-api-key
+```
+
+**This replaces all individual OAuth setups!** Connect to Glean MCP and get access to Slack, GitHub, Jira, Calendar, etc. through one connection.
+
+### 7. Mock Data (For Testing Without OAuth)
+```
+Key: USE_MOCK_DATA
+Value: true
+```
+**Set to `true` to use mock data instead of real integrations.** This lets you test the app without setting up OAuth credentials. Perfect for initial testing!
+
+**Priority:** Glean MCP > Mock Data > Individual OAuth
+
+## Optional: Individual Integration Credentials
 
 **⚠️ These are OPTIONAL** - The app works without them, but users won't be able to connect Slack, GitHub, Jira, or Calendar integrations.
 

@@ -577,10 +577,21 @@ function ConversationBrief({ pad, setPad, user = null }) {
     if (messages.length > 0) { setShowActions(false); const t = setTimeout(() => setShowActions(true), 400); return () => clearTimeout(t); }
   }, [messages.length]);
 
-  const addToPad = (text, type = "decision") => {
+  const addToPad = async (text, type = "decision") => {
     const now = new Date();
     const time = `Today ${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, "0")} ${now.getHours() >= 12 ? "PM" : "AM"}`;
-    setPad(p => [...p, { from: "agent", text, time, type }]);
+    const newEntry = { from: "agent", text, time, type };
+    setPad(p => [...p, newEntry]);
+    
+    // Save to backend (non-blocking)
+    try {
+      const current = await scratchpadAPI.get();
+      const newContent = (current.content || '') + (current.content ? '\n' : '') + `[${time}] ${text}`;
+      await scratchpadAPI.update(newContent);
+    } catch (error) {
+      console.error("Failed to save scratchpad entry:", error);
+      // Don't block UI - entry is already in local state
+    }
   };
 
   // Helper to advance to next item automatically
@@ -1273,12 +1284,53 @@ function ConversationBrief({ pad, setPad, user = null }) {
    ═══════════════════════════════════════ */
 function ScratchpadView({ pad, setPad }) {
   const [input, setInput] = useState("");
-  const addNote = () => {
+  const [loading, setLoading] = useState(false);
+  const [scratchpadContent, setScratchpadContent] = useState("");
+
+  // Load scratchpad from backend
+  useEffect(() => {
+    const loadScratchpad = async () => {
+      try {
+        const data = await scratchpadAPI.get();
+        setScratchpadContent(data.content || "");
+        // Parse content into pad entries if needed
+        if (data.content && pad.length === 0) {
+          // If we have content but no pad entries, create entries from content
+          const lines = data.content.split('\n').filter(l => l.trim());
+          const entries = lines.map(line => ({
+            from: "agent",
+            text: line.trim(),
+            time: "Earlier",
+            type: "observation"
+          }));
+          setPad(entries);
+        }
+      } catch (error) {
+        console.error("Failed to load scratchpad:", error);
+      }
+    };
+    loadScratchpad();
+  }, []);
+
+  const addNote = async () => {
     if (!input.trim()) return;
+    setLoading(true);
     const now = new Date();
     const time = `Today ${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, "0")} ${now.getHours() >= 12 ? "PM" : "AM"}`;
-    setPad(p => [...p, { from: "user", text: input.trim(), time, type: "user" }]);
-    setInput("");
+    const newNote = { from: "user", text: input.trim(), time, type: "user" };
+    setPad(p => [...p, newNote]);
+    
+    try {
+      // Update backend scratchpad
+      const newContent = scratchpadContent + (scratchpadContent ? '\n' : '') + `[${time}] ${input.trim()}`;
+      await scratchpadAPI.update(newContent);
+      setScratchpadContent(newContent);
+    } catch (error) {
+      console.error("Failed to save scratchpad:", error);
+    } finally {
+      setInput("");
+      setLoading(false);
+    }
   };
 
   const typeIcons = { observation: "👁", followup: "↩", carryover: "📌", decision: "✓", reminder: "⏰", user: "✎" };
@@ -1303,7 +1355,7 @@ function ScratchpadView({ pad, setPad }) {
               onKeyDown={e => { if (e.key === "Enter") addNote(); }}
               placeholder="Jot a note — it'll carry into tomorrow's brief…"
               style={{ flex: 1, padding: "10px 16px", borderRadius: 12, border: `1px solid ${C.bdr}`, background: C.bgW, fontSize: 14, color: C.txt, outline: "none", fontFamily: "'DM Sans', sans-serif" }} />
-            <button onClick={addNote} style={{ padding: "10px 20px", borderRadius: 12, border: "none", background: input.trim() ? C.acc : C.bgS, color: input.trim() ? "#fff" : C.txL, fontSize: 13, fontWeight: 600, cursor: input.trim() ? "pointer" : "default", transition: "all .15s" }}>Add</button>
+            <button onClick={addNote} disabled={loading || !input.trim()} style={{ padding: "10px 20px", borderRadius: 12, border: "none", background: input.trim() && !loading ? C.acc : C.bgS, color: input.trim() && !loading ? "#fff" : C.txL, fontSize: 13, fontWeight: 600, cursor: input.trim() && !loading ? "pointer" : "default", transition: "all .15s" }}>{loading ? "Saving..." : "Add"}</button>
           </div>
         </Fade>
 
@@ -1715,13 +1767,95 @@ function MemoryView() {
     },
   ]);
 
-  const handleEdit = (layerId, itemId, newValue) => {
+  // Try to load from backend, but use default if it fails
+  useEffect(() => {
+    const loadMemory = async () => {
+      try {
+        const data = await memoryAPI.get();
+        if (data && data.length > 0) {
+          // Transform backend memory to UI format
+          const transformed = [
+            {
+              id: "personal",
+              name: "Personal Memory",
+              icon: "🧠",
+              color: C.blue,
+              bg: C.blueS,
+              desc: "What I know about you — your work patterns, priorities, and habits.",
+              items: data.filter(m => m.layer === 'personal').map(m => ({
+                id: m.key,
+                label: m.key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                value: m.value,
+                source: m.source
+              }))
+            },
+            {
+              id: "team",
+              name: "Team Memory",
+              icon: "🏢",
+              color: C.grn,
+              bg: C.grnS,
+              desc: "Your team structure and health signals.",
+              items: data.filter(m => m.layer === 'team').map(m => ({
+                id: m.key,
+                label: m.key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                value: m.value,
+                source: m.source
+              }))
+            },
+            {
+              id: "recent",
+              name: "Recent Activity",
+              icon: "📅",
+              color: C.org,
+              bg: C.orgS,
+              desc: "What happened yesterday and today.",
+              items: data.filter(m => m.layer === 'recent').map(m => ({
+                id: m.key,
+                label: m.key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                value: m.value,
+                source: m.source
+              }))
+            }
+          ];
+          setMemory(transformed);
+        }
+      } catch (error) {
+        console.error("Failed to load memory from backend, using default:", error);
+        // Keep default memory structure
+      }
+    };
+    loadMemory();
+  }, []);
+
+  const handleEdit = async (layerId, itemId, newValue) => {
+    // Update local state immediately
     setMemory(m => m.map(layer => 
       layer.id === layerId 
         ? { ...layer, items: layer.items.map(item => item.id === itemId ? { ...item, value: newValue } : item) }
         : layer
     ));
     setEditing(null);
+    
+    // Try to save to backend (non-blocking)
+    try {
+      // Find the memory item ID from backend
+      const memoryData = await memoryAPI.get();
+      const backendItem = memoryData.find(m => {
+        const keyMatch = m.key === itemId || m.key.replace(/_/g, '') === itemId.replace(/_/g, '');
+        const layerMatch = (layerId === 'personal' && m.layer === 'personal') ||
+                          (layerId === 'team' && m.layer === 'team') ||
+                          (layerId === 'recent' && m.layer === 'recent');
+        return keyMatch && layerMatch;
+      });
+      
+      if (backendItem) {
+        await memoryAPI.update(backendItem.id, newValue);
+      }
+    } catch (error) {
+      console.error("Failed to save memory to backend:", error);
+      // Don't show error - local state is already updated
+    }
   };
 
   return (
@@ -2047,7 +2181,29 @@ export default function App() {
         {tab === "pad" && <ScratchpadView pad={pad} setPad={setPad} />}
         {tab === "memory" && <MemoryView />}
         {tab === "integrations" && <IntegrationsView />}
-        {tab === "slack" && <Slack />}
+        {tab === "slack" && (
+          <div style={{ padding: 48, textAlign: 'center', maxWidth: 600, margin: '0 auto' }}>
+            <h2 style={{ fontSize: 24, fontWeight: 700, color: C.txt, marginBottom: 16 }}>💬 Slack Integration</h2>
+            <p style={{ color: C.tx2, fontSize: 14, marginBottom: 24 }}>
+              Slack messages and threads appear in your Morning Brief. Connect Slack in the Integrations tab to get started.
+            </p>
+            <button
+              onClick={() => setTab("integrations")}
+              style={{
+                padding: '12px 24px',
+                borderRadius: 8,
+                border: 'none',
+                background: C.acc,
+                color: '#fff',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              Go to Integrations →
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
