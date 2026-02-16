@@ -16,10 +16,41 @@ const io = new Server(httpServer, {
   }
 });
 
-// Middleware
+// Middleware - CORS configuration
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://*.vercel.app' // Allow all Vercel preview deployments
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-  credentials: true
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.some(allowed => {
+      if (allowed?.includes('*')) {
+        // Handle wildcard patterns like *.vercel.app
+        const pattern = allowed.replace('*', '');
+        return origin.includes(pattern);
+      }
+      return origin === allowed;
+    })) {
+      callback(null, true);
+    } else {
+      // For development, allow all origins (remove in production if needed)
+      if (process.env.NODE_ENV !== 'production') {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 
