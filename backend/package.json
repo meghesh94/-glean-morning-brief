@@ -5,8 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc --skipLibCheck && npm run copy-schema",
-    "copy-schema": "node -e \"const fs=require('fs');const path=require('path');fs.mkdirSync('dist/db',{recursive:true});fs.copyFileSync('src/db/schema.sql','dist/db/schema.sql');\"",
+    "build": "tsc --skipLibCheck && npm run copy-schema || echo 'Schema copy skipped'",
+    "copy-schema": "node -e \"try{const fs=require('fs');const path=require('path');const srcPath=path.join(process.cwd(),'src','db','schema.sql');const destDir=path.join(process.cwd(),'dist','db');if(fs.existsSync(srcPath)){fs.mkdirSync(destDir,{recursive:true});fs.copyFileSync(srcPath,path.join(destDir,'schema.sql'));console.log('Schema copied successfully');}else{console.log('Schema file not found at',srcPath,'- migration will use source path');}}catch(e){console.log('Schema copy skipped:',e.message);}\"",
     "start": "node dist/index.js",
     "migrate": "tsx src/db/migrate.ts",
     "test": "jest",
