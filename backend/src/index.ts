@@ -24,33 +24,46 @@ const allowedOrigins = [
   'https://*.vercel.app' // Allow all Vercel preview deployments
 ].filter(Boolean);
 
+// Handle preflight requests
+app.options('*', cors());
+
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
     // Check if origin is in allowed list
-    if (allowedOrigins.some(allowed => {
+    const isAllowed = allowedOrigins.some(allowed => {
       if (allowed?.includes('*')) {
         // Handle wildcard patterns like *.vercel.app
         const pattern = allowed.replace('*', '');
         return origin.includes(pattern);
       }
       return origin === allowed;
-    })) {
+    });
+    
+    if (isAllowed) {
       callback(null, true);
     } else {
-      // For development, allow all origins (remove in production if needed)
+      // For development, allow all origins
       if (process.env.NODE_ENV !== 'production') {
         callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'));
+        // In production, be more permissive for Vercel domains
+        if (origin.includes('vercel.app') || origin.includes('vercel.com')) {
+          callback(null, true);
+        } else {
+          console.warn(`CORS blocked origin: ${origin}`);
+          callback(new Error('Not allowed by CORS'));
+        }
       }
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Length', 'Content-Type'],
+  maxAge: 86400 // 24 hours
 }));
 app.use(express.json());
 
