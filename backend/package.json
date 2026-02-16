@@ -5,7 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc --skipLibCheck",
+    "build": "tsc --skipLibCheck && npm run copy-schema",
+    "copy-schema": "node -e \"const fs=require('fs');const path=require('path');fs.mkdirSync('dist/db',{recursive:true});fs.copyFileSync('src/db/schema.sql','dist/db/schema.sql');\"",
     "start": "node dist/index.js",
     "migrate": "tsx src/db/migrate.ts",
     "test": "jest",

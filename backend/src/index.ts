@@ -44,7 +44,22 @@ async function runMigrations() {
     
     // Run migration
     console.log('Running database migrations...');
-    const schemaPath = path.join(__dirname, 'db', 'schema.sql');
+    // Try multiple paths (works in both dev and production)
+    // On Render: process.cwd() = /opt/render/project/src/backend
+    // __dirname in dist/index.js = /opt/render/project/src/backend/dist
+    let schemaPath = path.join(__dirname, 'db', 'schema.sql'); // dist/db/schema.sql (if copied)
+    if (!fs.existsSync(schemaPath)) {
+      // Try source path (for production - file is in src/)
+      schemaPath = path.join(process.cwd(), 'src', 'db', 'schema.sql');
+    }
+    if (!fs.existsSync(schemaPath)) {
+      // Try relative to dist (go up one level to src)
+      schemaPath = path.join(__dirname, '..', 'src', 'db', 'schema.sql');
+    }
+    if (!fs.existsSync(schemaPath)) {
+      throw new Error(`Schema file not found. Tried: ${schemaPath}. Current dir: ${__dirname}, CWD: ${process.cwd()}`);
+    }
+    console.log(`Using schema file: ${schemaPath}`);
     const schema = fs.readFileSync(schemaPath, 'utf8');
     await pool.query(schema);
     console.log('✅ Database migration completed successfully');
@@ -57,7 +72,17 @@ async function runMigrations() {
 // Migration endpoint (for manual trigger)
 app.post('/api/migrate', async (req: any, res: any) => {
   try {
-    const schemaPath = path.join(__dirname, 'db', 'schema.sql');
+    // Try multiple paths (works in both dev and production)
+    let schemaPath = path.join(__dirname, 'db', 'schema.sql');
+    if (!fs.existsSync(schemaPath)) {
+      schemaPath = path.join(process.cwd(), 'src', 'db', 'schema.sql');
+    }
+    if (!fs.existsSync(schemaPath)) {
+      schemaPath = path.join(__dirname, '..', 'src', 'db', 'schema.sql');
+    }
+    if (!fs.existsSync(schemaPath)) {
+      throw new Error(`Schema file not found. Tried: ${schemaPath}`);
+    }
     const schema = fs.readFileSync(schemaPath, 'utf8');
     await pool.query(schema);
     res.json({ success: true, message: 'Migration completed' });

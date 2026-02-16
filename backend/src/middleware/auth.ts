@@ -4,10 +4,6 @@ import { verifyToken } from '../utils/jwt';
 export interface AuthRequest extends Request {
   userId?: string;
   userEmail?: string;
-  query?: any;
-  params?: any;
-  body?: any;
-  headers?: any;
 }
 
 export function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
