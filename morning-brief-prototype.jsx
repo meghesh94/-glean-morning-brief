@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { briefAPI, conversationAPI, authAPI } from "./src/services/api";
 import { briefAPI, conversationAPI, authAPI, memoryAPI, scratchpadAPI } from "./src/services/api";
 
 /* ═══ AI AGENT CONFIGURATION ═══ */
@@ -459,7 +458,7 @@ const FILTERED_COUNT = 11;
 /* ═══════════════════════════════════════
    CONVERSATION BRIEF
    ═══════════════════════════════════════ */
-function ConversationBrief({ pad, setPad, user }) {
+function ConversationBrief({ pad, setPad, user = null }) {
   const [step, setStep] = useState(0);
   const [messages, setMessages] = useState([]);
   const [typing, setTyping] = useState(false);
@@ -552,12 +551,13 @@ function ConversationBrief({ pad, setPad, user }) {
       }
     };
     
-    if (user && !initializedRef.current) {
+    if (!initializedRef.current) {
       initializedRef.current = true;
+      // Try to load brief (will fall back to CONVO if API fails)
       setTyping(true);
       loadBrief();
     }
-  }, [user]);
+  }, []);
 
   useEffect(scrollToBottom, [messages, typing, showActions]);
   useEffect(() => {
@@ -1678,7 +1678,7 @@ export default function App() {
       <Nav a={tab} set={setTab} padCount={pad.length} />
       <div style={{ paddingTop: 48 }}>
         {tab === "day0" && <Day0 onDone={() => setTab("brief")} />}
-        {tab === "brief" && <ConversationBrief pad={pad} setPad={setPad} />}
+        {tab === "brief" && <ConversationBrief pad={pad} setPad={setPad} user={null} />}
         {tab === "pad" && <ScratchpadView pad={pad} setPad={setPad} />}
         {tab === "memory" && <MemoryView />}
         {tab === "slack" && <Slack />}
