@@ -197,6 +197,7 @@ const TABS = [
   { id: "brief", l: "Morning Brief", i: "☀️" },
   { id: "pad", l: "Scratchpad", i: "📝" },
   { id: "memory", l: "Memory", i: "🧠" },
+  { id: "integrations", l: "Integrations", i: "🔌" },
   { id: "slack", l: "Slack", i: "💬" },
 ];
 
@@ -1344,6 +1345,160 @@ function ScratchpadView({ pad, setPad }) {
 /* ═══════════════════════════════════════
    SLACK
    ═══════════════════════════════════════ */
+function IntegrationsView() {
+  const [integrations, setIntegrations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [connecting, setConnecting] = useState(null);
+
+  useEffect(() => {
+    const loadIntegrations = async () => {
+      try {
+        const list = await integrationsAPI.list();
+        setIntegrations(list);
+      } catch (error) {
+        console.error("Failed to load integrations:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadIntegrations();
+  }, []);
+
+  const handleConnect = async (provider) => {
+    try {
+      setConnecting(provider);
+      const { authUrl } = await integrationsAPI.getAuthUrl(provider);
+      // Redirect to OAuth URL
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error(`Failed to connect ${provider}:`, error);
+      alert(`Failed to connect ${provider}. Make sure OAuth credentials are set up in Render.`);
+      setConnecting(null);
+    }
+  };
+
+  const handleDisconnect = async (provider) => {
+    try {
+      await integrationsAPI.disconnect(provider);
+      const list = await integrationsAPI.list();
+      setIntegrations(list);
+    } catch (error) {
+      console.error(`Failed to disconnect ${provider}:`, error);
+    }
+  };
+
+  const providers = [
+    { id: 'slack', name: 'Slack', icon: '💬', description: 'Get notified about messages, threads, and mentions' },
+    { id: 'github', name: 'GitHub', icon: '🐙', description: 'Track PRs, issues, and code reviews' },
+    { id: 'jira', name: 'Jira', icon: '🎯', description: 'Monitor tickets, sprints, and blockers' },
+    { id: 'calendar', name: 'Google Calendar', icon: '📅', description: 'See your schedule and meeting context' }
+  ];
+
+  if (loading) {
+    return (
+      <div style={{ padding: 48, textAlign: 'center' }}>
+        <div>Loading integrations...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 800, margin: '0 auto', padding: 48 }}>
+      <h2 style={{ fontSize: 24, fontWeight: 700, color: C.txt, marginBottom: 8 }}>Connected Integrations</h2>
+      <p style={{ color: C.tx2, fontSize: 14, marginBottom: 32 }}>
+        Connect your tools to see brief items in your morning brief.
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {providers.map(provider => {
+          const connected = integrations.find(i => i.provider === provider.id && i.is_active);
+          return (
+            <div
+              key={provider.id}
+              style={{
+                padding: 20,
+                background: C.bgW,
+                border: `1px solid ${C.bdr}`,
+                borderRadius: 8,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div style={{ fontSize: 32 }}>{provider.icon}</div>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: C.txt, marginBottom: 4 }}>
+                    {provider.name}
+                  </div>
+                  <div style={{ fontSize: 13, color: C.tx2 }}>
+                    {provider.description}
+                  </div>
+                </div>
+              </div>
+              <div>
+                {connected ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 12, color: '#22c55e', fontWeight: 600 }}>✓ Connected</span>
+                    <button
+                      onClick={() => handleDisconnect(provider.id)}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: 6,
+                        border: `1px solid ${C.bdr}`,
+                        background: C.bgW,
+                        color: C.tx2,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleConnect(provider.id)}
+                    disabled={connecting === provider.id}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: 6,
+                      border: 'none',
+                      background: connecting === provider.id ? C.bgS : C.acc,
+                      color: '#fff',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: connecting === provider.id ? 'not-allowed' : 'pointer',
+                      opacity: connecting === provider.id ? 0.6 : 1
+                    }}
+                  >
+                    {connecting === provider.id ? 'Connecting...' : 'Connect'}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {integrations.length === 0 && (
+        <div style={{
+          marginTop: 32,
+          padding: 20,
+          background: C.bgS,
+          borderRadius: 8,
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: 13, color: C.tx2 }}>
+            <strong>Note:</strong> OAuth credentials need to be set up in Render environment variables for connections to work.
+            See <code>HOW_TO_CONNECT_INTEGRATIONS.md</code> for setup instructions.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Slack() {
   const [replied, setReplied] = useState({});
   return (
@@ -1891,6 +2046,7 @@ export default function App() {
         {tab === "brief" && <ConversationBrief pad={pad} setPad={setPad} user={user} />}
         {tab === "pad" && <ScratchpadView pad={pad} setPad={setPad} />}
         {tab === "memory" && <MemoryView />}
+        {tab === "integrations" && <IntegrationsView />}
         {tab === "slack" && <Slack />}
       </div>
     </div>

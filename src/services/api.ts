@@ -96,7 +96,7 @@ export const authAPI = {
 export const integrationsAPI = {
   getAuthUrl: async (provider: string) => {
     const { data } = await api.get(`/integrations/${provider}/auth`);
-    return data.authUrl;
+    return data;
   },
   list: async (): Promise<Integration[]> => {
     const { data } = await api.get('/integrations');
