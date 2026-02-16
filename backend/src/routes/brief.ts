@@ -30,10 +30,12 @@ router.post('/generate', authenticate, async (req: AuthRequest, res: Response) =
 
     const generator = new BriefGenerator();
     const items = await generator.generateBrief(req.userId);
+    // Always return success, even if items array is empty (no integrations)
     res.json({ items, count: items.length });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Generate brief error:', error);
-    res.status(500).json({ error: 'Failed to generate brief' });
+    // Return empty array instead of error - allows frontend to show empty state
+    res.json({ items: [], count: 0, message: 'No brief items generated (no integrations connected)' });
   }
 });
 

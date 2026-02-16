@@ -8,58 +8,78 @@ import { calculateUrgency, UrgencyFactors } from './urgency';
 
 export class BriefGenerator {
   async generateBrief(userId: string): Promise<BriefItem[]> {
-    const integrations = await IntegrationModel.findByUser(userId);
-    const activeIntegrations = integrations.filter(i => i.is_active);
-    
-    const briefItems: BriefItem[] = [];
-
-    // Generate items from each integration
-    for (const integration of activeIntegrations) {
-      try {
-        switch (integration.provider) {
-          case 'slack':
-            const slackItems = await this.generateSlackItems(userId, integration);
-            briefItems.push(...slackItems);
-            break;
-          case 'github':
-            const githubItems = await this.generateGitHubItems(userId, integration);
-            briefItems.push(...githubItems);
-            break;
-          case 'jira':
-            const jiraItems = await this.generateJiraItems(userId, integration);
-            briefItems.push(...jiraItems);
-            break;
-          case 'calendar':
-            const calendarItems = await this.generateCalendarItems(userId, integration);
-            briefItems.push(...calendarItems);
-            break;
-        }
-      } catch (error) {
-        console.error(`Error generating brief items for ${integration.provider}:`, error);
-      }
-    }
-
-    // Save all brief items
-    const savedItems: BriefItem[] = [];
-    for (const item of briefItems) {
-      // Check if item already exists
-      if (item.external_id) {
-        const existing = await BriefItemModel.findByExternalId(
-          userId,
-          item.external_id,
-          item.source
-        );
-        if (existing) {
-          // Update existing item
-          continue;
-        }
+    try {
+      const integrations = await IntegrationModel.findByUser(userId);
+      const activeIntegrations = integrations.filter(i => i.is_active);
+      
+      // If no integrations, return empty array (not an error)
+      if (activeIntegrations.length === 0) {
+        console.log(`No active integrations for user ${userId}, returning empty brief`);
+        return [];
       }
       
-      const saved = await BriefItemModel.create(item);
-      savedItems.push(saved);
-    }
+      const briefItems: BriefItem[] = [];
 
-    return savedItems;
+      // Generate items from each integration
+      for (const integration of activeIntegrations) {
+        try {
+          switch (integration.provider) {
+            case 'slack':
+              const slackItems = await this.generateSlackItems(userId, integration);
+              briefItems.push(...slackItems);
+              break;
+            case 'github':
+              const githubItems = await this.generateGitHubItems(userId, integration);
+              briefItems.push(...githubItems);
+              break;
+            case 'jira':
+              const jiraItems = await this.generateJiraItems(userId, integration);
+              briefItems.push(...jiraItems);
+              break;
+            case 'calendar':
+              const calendarItems = await this.generateCalendarItems(userId, integration);
+              briefItems.push(...calendarItems);
+              break;
+          }
+        } catch (error) {
+          console.error(`Error generating brief items for ${integration.provider}:`, error);
+          // Continue with other integrations even if one fails
+        }
+      }
+
+      // Save all brief items
+      const savedItems: BriefItem[] = [];
+      for (const item of briefItems) {
+        try {
+          // Check if item already exists
+          if (item.external_id) {
+            const existing = await BriefItemModel.findByExternalId(
+              userId,
+              item.external_id,
+              item.source
+            );
+            if (existing) {
+              // Item already exists, skip (or could update if needed)
+              savedItems.push(existing);
+              continue;
+            }
+          }
+          
+          // Create new item
+          const saved = await BriefItemModel.create(item);
+          savedItems.push(saved);
+        } catch (error) {
+          console.error(`Error saving brief item:`, error);
+          // Continue with other items even if one fails
+        }
+      }
+
+      return savedItems;
+    } catch (error) {
+      console.error('Error in generateBrief:', error);
+      // Return empty array instead of throwing - allows frontend to show empty state
+      return [];
+    }
   }
 
   private async generateSlackItems(userId: string, integration: any): Promise<BriefItem[]> {

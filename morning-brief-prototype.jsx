@@ -1680,17 +1680,215 @@ function MemoryView() {
   );
 }
 
+/* ═══ LOGIN VIEW ═══ */
+function LoginView({ onLogin }) {
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLogin, setIsLogin] = useState(true);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      if (isLogin) {
+        const data = await authAPI.login(email, password || undefined);
+        onLogin(data.user);
+      } else {
+        const data = await authAPI.register(email, name, password || undefined);
+        onLogin(data.user);
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || "Authentication failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ 
+      minHeight: "100vh", 
+      display: "flex", 
+      alignItems: "center", 
+      justifyContent: "center",
+      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+      fontFamily: "'DM Sans', -apple-system, sans-serif"
+    }}>
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+      <div style={{ 
+        maxWidth: 400, 
+        width: "100%",
+        margin: "20px",
+        padding: 40, 
+        background: "#fff",
+        borderRadius: 12,
+        boxShadow: "0 10px 40px rgba(0,0,0,0.1)"
+      }}>
+        <h2 style={{ marginBottom: 8, fontSize: 28, fontWeight: 700, color: "#1a1a1a" }}>
+          {isLogin ? "Welcome back" : "Get started"}
+        </h2>
+        <p style={{ marginBottom: 32, fontSize: 14, color: "#666" }}>
+          {isLogin ? "Sign in to your account" : "Create a new account to continue"}
+        </p>
+        {error && (
+          <div style={{ 
+            padding: 12, 
+            marginBottom: 20, 
+            background: "#fee", 
+            border: "1px solid #fcc",
+            borderRadius: 6,
+            color: "#c33",
+            fontSize: 14
+          }}>
+            {error}
+          </div>
+        )}
+        <form onSubmit={handleSubmit}>
+          {!isLogin && (
+            <input
+              type="text"
+              placeholder="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              style={{ 
+                width: "100%", 
+                padding: 12, 
+                marginBottom: 12, 
+                borderRadius: 6, 
+                border: "1px solid #ddd",
+                fontSize: 14,
+                boxSizing: "border-box"
+              }}
+            />
+          )}
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            style={{ 
+              width: "100%", 
+              padding: 12, 
+              marginBottom: 12, 
+              borderRadius: 6, 
+              border: "1px solid #ddd",
+              fontSize: 14,
+              boxSizing: "border-box"
+            }}
+          />
+          <input
+            type="password"
+            placeholder="Password (optional)"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={{ 
+              width: "100%", 
+              padding: 12, 
+              marginBottom: 20, 
+              borderRadius: 6, 
+              border: "1px solid #ddd",
+              fontSize: 14,
+              boxSizing: "border-box"
+            }}
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            style={{ 
+              width: "100%", 
+              padding: 14, 
+              background: loading ? "#999" : "#667eea", 
+              color: "#fff", 
+              border: "none", 
+              borderRadius: 6, 
+              cursor: loading ? "not-allowed" : "pointer", 
+              fontWeight: 600,
+              fontSize: 15,
+              transition: "background 0.2s"
+            }}
+          >
+            {loading ? "Loading..." : (isLogin ? "Sign in" : "Create account")}
+          </button>
+        </form>
+        <button
+          onClick={() => setIsLogin(!isLogin)}
+          style={{ 
+            marginTop: 20, 
+            background: "transparent", 
+            border: "none", 
+            color: "#667eea", 
+            cursor: "pointer",
+            fontSize: 14,
+            textDecoration: "underline"
+          }}
+        >
+          {isLogin ? "Need an account? Register" : "Already have an account? Sign in"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ═══ APP ═══ */
 export default function App() {
   const [tab, setTab] = useState("day0");
-  const [pad, setPad] = useState([...INITIAL_PAD]);
+  const [pad, setPad] = useState([]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Check authentication on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const userData = await authAPI.getMe();
+          setUser(userData);
+          setIsAuthenticated(true);
+        } catch (err) {
+          localStorage.removeItem('token');
+          setIsAuthenticated(false);
+        }
+      }
+      setLoading(false);
+    };
+    checkAuth();
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{ 
+        minHeight: "100vh", 
+        display: "flex", 
+        alignItems: "center", 
+        justifyContent: "center",
+        fontFamily: "'DM Sans', -apple-system, sans-serif"
+      }}>
+        <div>Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginView onLogin={(userData) => { 
+      setUser(userData); 
+      setIsAuthenticated(true); 
+    }} />;
+  }
+
   return (
     <div style={{ fontFamily: "'DM Sans', -apple-system, sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=DM+Sans:wght@400;500;600;700&family=Lato:wght@400;700;900&display=swap" rel="stylesheet" />
       <Nav a={tab} set={setTab} padCount={pad.length} />
       <div style={{ paddingTop: 48 }}>
         {tab === "day0" && <Day0 onDone={() => setTab("brief")} />}
-        {tab === "brief" && <ConversationBrief pad={pad} setPad={setPad} user={null} />}
+        {tab === "brief" && <ConversationBrief pad={pad} setPad={setPad} user={user} />}
         {tab === "pad" && <ScratchpadView pad={pad} setPad={setPad} />}
         {tab === "memory" && <MemoryView />}
         {tab === "slack" && <Slack />}
