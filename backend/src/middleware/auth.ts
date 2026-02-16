@@ -4,6 +4,11 @@ import { verifyToken } from '../utils/jwt';
 export interface AuthRequest extends Request {
   userId?: string;
   userEmail?: string;
+  // Explicitly include Request properties for TypeScript
+  headers: Request['headers'];
+  query: Request['query'];
+  params: Request['params'];
+  body: Request['body'];
 }
 
 export function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
