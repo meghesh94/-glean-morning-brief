@@ -56,7 +56,9 @@ Value: https://your-vercel-app.vercel.app
 
 ## Optional: Integration Credentials
 
-Add these only if you want to test integrations:
+**⚠️ These are OPTIONAL** - The app works without them, but users won't be able to connect Slack, GitHub, Jira, or Calendar integrations.
+
+**Add these only if you want to test integrations:**
 
 ### Slack
 ```

@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { briefAPI, conversationAPI, authAPI } from "./src/services/api";
+import { briefAPI, conversationAPI, authAPI, memoryAPI, scratchpadAPI } from "./src/services/api";
 
 /* ═══ AI AGENT CONFIGURATION ═══ */
 // Set to true to use AI, false for rule-based fallback
@@ -457,7 +459,7 @@ const FILTERED_COUNT = 11;
 /* ═══════════════════════════════════════
    CONVERSATION BRIEF
    ═══════════════════════════════════════ */
-function ConversationBrief({ pad, setPad }) {
+function ConversationBrief({ pad, setPad, user }) {
   const [step, setStep] = useState(0);
   const [messages, setMessages] = useState([]);
   const [typing, setTyping] = useState(false);
@@ -465,6 +467,8 @@ function ConversationBrief({ pad, setPad }) {
   const [pulledIn, setPulledIn] = useState({});
   const [inputText, setInputText] = useState("");
   const [pendingSlackMessage, setPendingSlackMessage] = useState(null);
+  const [briefItems, setBriefItems] = useState([]);
+  const [loadingBrief, setLoadingBrief] = useState(true);
   const endRef = useRef(null);
   const initializedRef = useRef(false);
   const allDone = messages.some(m => m.type === "complete");
@@ -473,31 +477,87 @@ function ConversationBrief({ pad, setPad }) {
     setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
   }, []);
 
-  // Push first messages (only once, even in StrictMode)
+  // Load brief items from API
   useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
+    const loadBrief = async () => {
+      try {
+        setLoadingBrief(true);
+        // First try to generate brief (in case it's empty)
+        await briefAPI.generate();
+        // Then fetch items
+        const items = await briefAPI.get(50);
+        setBriefItems(items);
+        
+        // Convert backend items to CONVO format for display
+        if (items.length > 0) {
+          // Create greeting message
+          const greeting = {
+            type: "assistant",
+            text: `Good morning, ${user?.name || 'there'}. I've been watching your apps and found ${items.length} items that need your attention. Let me walk you through them.`
+          };
+          
+          // Convert brief items to conversation format
+          const convoItems = items.map(item => ({
+            ...item,
+            type: item.type,
+            source: item.source,
+            urgency: item.urgency,
+            text: item.text,
+            metadata: item.metadata || {},
+            blocked: item.metadata?.blocked || [],
+            draft: item.metadata?.draft,
+            cascade: item.metadata?.cascade,
+            why: item.metadata?.why,
+            actions: [
+              { label: "Got it", type: "ack", id: item.id },
+              { label: "Remind me later", type: "later", id: item.id },
+              { label: "Skip", type: "skip", id: item.id }
+            ]
+          }));
+          
+          // Add calendar item if exists
+          const calendarItem = items.find(i => i.type === 'calendar');
+          const itemMessages = items.filter(i => i.type === 'item');
+          
+          setMessages([greeting]);
+          if (calendarItem) {
+            setTimeout(() => {
+              setMessages(m => [...m, calendarItem]);
+              setStep(1);
+            }, 1500);
+          }
+          
+          // Show first item after calendar
+          if (itemMessages.length > 0) {
+            setTimeout(() => {
+              setMessages(m => [...m, itemMessages[0]]);
+              setStep(calendarItem ? 2 : 1);
+            }, calendarItem ? 3000 : 2000);
+          }
+        } else {
+          // No items - show empty state
+          setMessages([{
+            type: "assistant",
+            text: "Good morning! No urgent items right now. Connect your integrations (Slack, GitHub, Jira, Calendar) to see your brief items here."
+          }]);
+        }
+      } catch (error) {
+        console.error("Failed to load brief:", error);
+        // Fallback to placeholder data if API fails
+        setMessages([CONVO[0]]);
+        setStep(0);
+      } finally {
+        setLoadingBrief(false);
+        setTyping(false);
+      }
+    };
     
-    // Log API key status on startup (for debugging)
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-    console.log("AI Configuration:", {
-      USE_AI,
-      hasApiKey: !!apiKey,
-      apiKeyLength: apiKey ? apiKey.length : 0,
-      apiKeyPrefix: apiKey ? apiKey.substring(0, 7) + "..." : "none"
-    });
-    
-    setTyping(true);
-    setTimeout(() => {
-      setMessages([CONVO[0]]);
-      setStep(0);
-      setTyping(false);
-      setTimeout(() => {
-        setTyping(true);
-        setTimeout(() => { setMessages(m => [...m, CONVO[1]]); setStep(1); setTyping(false); }, 800);
-      }, 1500);
-    }, 600);
-  }, []);
+    if (user && !initializedRef.current) {
+      initializedRef.current = true;
+      setTyping(true);
+      loadBrief();
+    }
+  }, [user]);
 
   useEffect(scrollToBottom, [messages, typing, showActions]);
   useEffect(() => {
@@ -544,7 +604,7 @@ function ConversationBrief({ pad, setPad }) {
   };
 
   const advance = (actionLabel, actionType, itemId) => {
-    const currentItem = CONVO[step];
+    const currentItem = briefItems.find(item => item.id === itemId) || messages[messages.length - 1];
 
     // Agent writes to scratchpad based on what happened
     if (actionType === "send" || actionType === "approve") {
@@ -737,7 +797,7 @@ function ConversationBrief({ pad, setPad }) {
           .filter(Boolean);
         
         // Get current item for context
-        const currentItem = CONVO[step] || null;
+        const currentItem = briefItems.find(item => item.id === messages[messages.length - 1]?.id) || null;
         
         console.log("Attempting AI call for:", text, "with", conversationHistory.length, "messages in history");
         const aiResponse = await getAIResponse(text, conversationHistory, { 
@@ -854,7 +914,7 @@ function ConversationBrief({ pad, setPad }) {
           response = { type: "freeresponse", text: "What would you like to change in the message? I can update it and show you a new preview." };
         }
       } else if (lower.includes("more") || lower.includes("detail") || lower.includes("context") || lower.includes("tell me about") || lower.includes("explain")) {
-        const current = CONVO[step];
+        const current = briefItems.find(item => item.id === messages[messages.length - 1]?.id) || null;
         if (current?.blocked) {
           response = { type: "freeresponse", text: "Here's the full picture: Marcus originally proposed event sourcing for its audit trail benefits. Anil pushed back with CQRS for read/write separation. The team discussed it in #eng-backend but couldn't agree without your call. Three sprint tickets are parked. Want me to pull up the Slack thread?" };
         } else if (current?.prSummary) {

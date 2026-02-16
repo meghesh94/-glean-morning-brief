@@ -20,11 +20,14 @@ Vercel for frontend + Render for backend is a great combination!
 2. Connect your GitHub repository
 3. Configure:
    - **Name:** `glean-brief-backend` (or any name)
-   - **Root Directory:** `backend`
+   - **Root Directory:** `backend` ⚠️ **IMPORTANT: Must be exactly `backend`**
    - **Environment:** `Node`
    - **Build Command:** `npm install && npm run build`
+   - **⚠️ IMPORTANT:** Make sure "Install Command" is empty or set to `npm install` (not `npm ci --production` which skips devDependencies needed for TypeScript build)
    - **Start Command:** `npm start`
    - **Plan:** Free (or paid for better performance)
+
+**⚠️ CRITICAL:** Make sure "Root Directory" is set to `backend` (not root `/`). If it's set to root, Render will try to build the frontend and fail.
 
 ### 1.4 Add Environment Variables
 In Render dashboard → Your backend service → Environment tab, add:
@@ -57,12 +60,18 @@ GOOGLE_REDIRECT_URI=https://your-app.onrender.com/api/integrations/google/callba
 
 Add these to Render environment variables too.
 
-### 1.6 Run Database Migrations
-After first deployment:
-1. Go to your backend service in Render
-2. Click "Shell" tab (or use "Manual Deploy" → "Run Command")
-3. Run: `npm run migrate`
-   - Or if that doesn't work: `npx tsx src/db/migrate.ts`
+### 1.6 Database Migrations
+**✅ Migrations run automatically on server startup!**
+
+The backend checks if tables exist and runs migrations automatically. No manual steps needed.
+
+**To verify migrations ran:**
+1. Check Render logs for: `✅ Database migration completed successfully`
+2. Or test the API: Try registering a user at `/api/auth/register`
+
+**If automatic migration fails:**
+- See `RENDER_MIGRATIONS.md` for alternative methods
+- Or call: `POST https://your-backend.onrender.com/api/migrate`
 
 ### 1.7 Get Your Backend URL
 - Render will give you a URL like: `https://your-app.onrender.com`
@@ -91,10 +100,11 @@ After first deployment:
 In Vercel project settings → Environment Variables, add:
 
 ```env
-VITE_API_URL=https://your-backend.onrender.com/api
+VITE_API_URL=https://glean-morning-brief.onrender.com/api
 ```
 
-Replace `your-backend.onrender.com` with your actual Render backend URL.
+**Your Render URL:** `https://glean-morning-brief.onrender.com`
+**API URL for Vercel:** `https://glean-morning-brief.onrender.com/api`
 
 ### 2.5 Deploy!
 - Click "Deploy"
@@ -103,13 +113,15 @@ Replace `your-backend.onrender.com` with your actual Render backend URL.
 
 ## Step 3: Update Backend CORS
 
-Go back to Render backend environment variables and update:
+After you deploy to Vercel and get your Vercel URL (something like `your-app.vercel.app`):
+
+Go back to Render → Your backend service → Environment tab, and update:
 
 ```env
-FRONTEND_URL=https://your-app.vercel.app
+FRONTEND_URL=https://your-vercel-app.vercel.app
 ```
 
-Replace with your actual Vercel URL.
+Replace with your actual Vercel URL (you'll get this after deploying to Vercel in Step 2).
 
 ## Step 4: Fix Port Issue (Important!)
 
